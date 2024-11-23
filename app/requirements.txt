@@ -1,0 +1,10 @@
+SQLAlchemy
+unidecode
+fastapi
+python-decouple
+requests
+httpx
+passlib
+pydantic[email]
+python-slugify
+shortuuid
