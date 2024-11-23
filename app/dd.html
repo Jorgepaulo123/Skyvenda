@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat WebSocket</title>
+    <style>
+        #messages { max-height: 300px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        #typing-status { font-style: italic; color: #888; }
+    </style>
+</head>
+<body>
+    <h1>Chat WebSocket</h1>
+
+    <!-- Entrada para o ID do usuário e ID do destinatário -->
+    <label for="user-id">Seu ID:</label>
+    <input type="number" id="user-id" placeholder="Digite seu ID" required />
+
+    <label for="receiver-id">ID do Destinatário:</label>
+    <input type="number" id="receiver-id" placeholder="Digite o ID do destinatário" required />
+    
+    <div id="messages"></div>
+    <p id="typing-status"></p>
+    <input type="text" id="message-input" placeholder="Digite sua mensagem..." autocomplete="off" />
+    <button id="send-button">Enviar</button>
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" id="file-input" name="file" />
+        <button type="submit">Enviar Arquivo</button>
+    </form>
+
+    <script>
+        const userIdInput = document.getElementById("user-id");
+        const receiverIdInput = document.getElementById("receiver-id");
+        const messagesDiv = document.getElementById("messages");
+        const typingStatus = document.getElementById("typing-status");
+        const messageInput = document.getElementById("message-input");
+        const sendButton = document.getElementById("send-button");
+        const uploadForm = document.getElementById("upload-form");
+
+        let ws;
+
+        // Função para inicializar o WebSocket
+        function initWebSocket() {
+            const userId = userIdInput.value;
+            if (!userId) {
+                alert("ID de usuário é obrigatório.");
+                return;
+            }
+
+            ws = new WebSocket(`ws://192.168.1.62:5000/ws/${userId}`);
+            
+            ws.onopen = () => console.log("Conectado ao WebSocket");
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === "typing_status") {
+                    typingStatus.innerText = data.is_typing ? `Usuário ${data.user_id} está digitando...` : "";
+                } else if (data.type === "message") {
+                    displayMessage(data.message.sender_id, data.message.content || data.message.file_url);
+                }
+            };
+        }
+
+        // Função para exibir mensagens no chat
+        function displayMessage(senderId, content) {
+            const messageElement = document.createElement("p");
+            messageElement.innerText = `Usuário ${senderId}: ${content}`;
+            messagesDiv.appendChild(messageElement);
+        }
+
+        // Função para buscar o histórico de mensagens
+        async function fetchMessageHistory() {
+            const userId = userIdInput.value;
+            const receiverId = receiverIdInput.value;
+
+            if (!userId || !receiverId) {
+                alert("ID do usuário e ID do destinatário são necessários.");
+                return;
+            }
+
+            try {
+                const response = await fetch(`/messages/${receiverId}`, {
+                    headers: { "Authorization": `Bearer seu_token_aqui` },
+                });
+
+                if (response.ok) {
+                    const messages = await response.json();
+                    messagesDiv.innerHTML = "";  // Limpa mensagens anteriores da interface
+                    messages.reverse().forEach(message => {
+                        displayMessage(message.sender_id, message.content || message.file_url);
+                    });
+                } else {
+                    alert("Erro ao carregar o histórico de mensagens.");
+                }
+            } catch (error) {
+                console.error("Erro ao buscar mensagens:", error);
+            }
+        }
+
+        // Enviar mensagem
+        sendButton.onclick = () => {
+            const userId = userIdInput.value;
+            const receiverId = receiverIdInput.value;
+            const content = messageInput.value;
+
+            if (!userId || !receiverId || !content.trim()) {
+                alert("IDs e mensagem são obrigatórios.");
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                type: "message",
+                receiver_id: parseInt(receiverId),
+                content: content
+            }));
+
+            displayMessage(userId, content);  // Exibir a mensagem enviada localmente
+            messageInput.value = "";
+        };
+
+        // Indicar status de digitação
+        messageInput.onkeypress = () => {
+            const userId = userIdInput.value;
+            const receiverId = receiverIdInput.value;
+
+            if (userId && receiverId) {
+                ws.send(JSON.stringify({
+                    type: "typing",
+                    receiver_id: parseInt(receiverId),
+                    is_typing: true
+                }));
+            }
+        };
+
+        // Enviar arquivo
+        uploadForm.onsubmit = async (event) => {
+            event.preventDefault();
+            const receiverId = receiverIdInput.value;
+            const userId = userIdInput.value;
+
+            if (!userId || !receiverId) {
+                alert("IDs de usuário e destinatário são obrigatórios para enviar arquivos.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", document.getElementById("file-input").files[0]);
+
+            const response = await fetch(`/upload/${receiverId}`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer seu_token_aqui`
+                },
+                body: formData
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                alert("Arquivo enviado com sucesso!");
+            } else {
+                alert("Erro ao enviar o arquivo: " + result.detail);
+            }
+        };
+
+        // Carregar histórico de mensagens ao selecionar IDs
+        userIdInput.addEventListener("change", fetchMessageHistory);
+        receiverIdInput.addEventListener("change", fetchMessageHistory);
+
+        // Inicializar WebSocket quando o usuário inserir seu ID
+        userIdInput.addEventListener("change", initWebSocket);
+        //chave=HrWAV8UERIGwXyk0vJvzYs9NP7Wy8LyeJububJS7jcPaxqkY5OFYSrpI
+
+
+        var t="ara baixar videos do https://www.pexels.com/ esse e minha chave de api HrWAV8UERIGwXyk0vJvzYs9NP7Wy8LyeJububJS7jcPaxqkY5OFYSrpI,deve ser um site muito moderno deve listar os video na primeira tela e permitir pesquisar os videos"
+    </script>
+</body>
+</html>
